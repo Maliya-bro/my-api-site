@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CineSubz Relay API · Docs</title>
+<meta name="description" content="Public JSON API for searching and resolving CineSubz download links." />
+<style>
+  :root {
+    --bg: #050810;
+    --panel: rgba(15, 20, 35, 0.72);
+    --panel-solid: #0f1423;
+    --panel-2: #070b14;
+    --border: rgba(34, 211, 238, 0.15);
+    --border-strong: rgba(34, 211, 238, 0.4);
+    --text: #d8e1f0;
+    --muted: #6b7a99;
+    --accent: #22d3ee;
+    --accent-2: #a855f7;
+    --accent-3: #ec4899;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --code: #070b14;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ===== ANIMATED BACKGROUND ===== */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none; opacity: 0.9;
+  }
+  .bg-orb {
+    position: fixed; border-radius: 50%; filter: blur(90px);
+    opacity: 0.35; z-index: 0; pointer-events: none;
+    will-change: transform;
+  }
+  .bg-orb.o1 {
+    width: 550px; height: 550px;
+    background: radial-gradient(circle, #22d3ee, transparent 70%);
+    top: -180px; left: -150px;
+    animation: orb1 20s ease-in-out infinite alternate;
+  }
+  .bg-orb.o2 {
+    width: 650px; height: 650px;
+    background: radial-gradient(circle, #a855f7, transparent 70%);
+    top: 35%; right: -250px;
+    animation: orb2 24s ease-in-out infinite alternate;
+  }
+  .bg-orb.o3 {
+    width: 480px; height: 480px;
+    background: radial-gradient(circle, #ec4899, transparent 70%);
+    bottom: -180px; left: 25%;
+    animation: orb3 22s ease-in-out infinite alternate;
+  }
+  @keyframes orb1 { to { transform: translate(140px, 100px) scale(1.15); } }
+  @keyframes orb2 { to { transform: translate(-120px, -140px) scale(0.9); } }
+  @keyframes orb3 { to { transform: translate(100px, -120px) scale(1.1); } }
+
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(34, 211, 238, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.07) 1px, transparent 1px);
+    background-size: 64px 64px;
+    animation: gridScroll 24s linear infinite;
+    mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+  }
+  @keyframes gridScroll { to { background-position: 64px 64px; } }
+
+  .bg-scanlines {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent 3px,
+      rgba(34, 211, 238, 0.018) 3px, rgba(34, 211, 238, 0.018) 4px
+    );
+  }
+  .bg-vignette {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+  }
+
+  .container { position: relative; z-index: 1; max-width: 950px; margin: 0 auto; }
+
+  /* ===== HEADER ===== */
+  header { text-align: center; margin-bottom: 2.5rem; padding-top: 1rem; }
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #050810; font-weight: 800; font-size: 0.7rem;
+    padding: 0.28rem 0.65rem; border-radius: 999px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin-left: 0.5rem; vertical-align: middle;
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.6);
+    animation: badgePulse 3s ease-in-out infinite;
+  }
+  @keyframes badgePulse {
+    50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.6); }
+  }
+  h1 {
+    font-size: clamp(1.7rem, 5vw, 2.6rem);
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+    background: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% auto;
+    animation: shine 6s linear infinite;
+  }
+  @keyframes shine { to { background-position: 200% center; } }
+  .tagline {
+    color: var(--muted); margin: 0;
+    font-size: 0.95rem;
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .tagline::before { content: "$ "; color: var(--accent); }
+  .tagline::after {
+    content: "▊"; animation: blink 1s steps(2) infinite;
+    color: var(--accent); margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ===== BASE URL ===== */
+  .base-url {
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.2rem 1.3rem;
+    margin-bottom: 1.5rem;
+    display: flex; flex-direction: column; gap: 0.55rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  .base-url::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.6;
+  }
+  .base-url label {
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--accent); font-weight: 700;
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .url-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .url-row code {
+    flex: 1; min-width: 0;
+    background: var(--code);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+    font-size: 0.85rem;
+    overflow-x: auto; white-space: nowrap;
+    text-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+  }
+
+  /* ===== BUTTONS ===== */
+  button {
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #050810;
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem 1.15rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 20px rgba(34, 211, 238, 0.3);
+  }
+  button:hover {
+    filter: brightness(1.15);
+    box-shadow: 0 4px 30px rgba(34, 211, 238, 0.55);
+    transform: translateY(-1px);
+  }
+  button:active { transform: scale(0.97); }
+  button.secondary {
+    background: var(--panel-2);
+    color: var(--accent);
+    border: 1px solid var(--border-strong);
+    box-shadow: none;
+  }
+  button.secondary:hover {
+    background: var(--panel-solid);
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
+  }
+
+  /* ===== RATE PANEL ===== */
+  .rate-panel {
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  .rate-panel::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+    background-size: 200% auto;
+    animation: slideGrad 4s linear infinite;
+  }
+  @keyframes slideGrad { to { background-position: 200% center; } }
+  .rate-head {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1rem;
+  }
+  .rate-head h2 {
+    margin: 0; font-size: 1.15rem; border: none; padding: 0;
+    color: var(--text);
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .rate-head h2::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 12px var(--green);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+  @keyframes dotPulse {
+    50% { box-shadow: 0 0 20px var(--green), 0 0 30px var(--green); }
+  }
+  .rate-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+  .rate-stat {
+    background: var(--code);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+  }
+  .rate-stat .label {
+    font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--muted);
+    font-weight: 700; margin-bottom: 0.35rem;
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .rate-stat .value {
+    font-size: 1.6rem; font-weight: 800;
+    font-family: "SF Mono", Monaco, monospace; line-height: 1;
+  }
+  .rate-stat .value.green { color: var(--green); text-shadow: 0 0 15px rgba(16,185,129,0.5); }
+  .rate-stat .value.yellow { color: var(--yellow); text-shadow: 0 0 15px rgba(234,179,8,0.5); }
+  .rate-stat .value.red { color: var(--red); text-shadow: 0 0 15px rgba(239,68,68,0.5); }
+  .rate-stat .value.cyan { color: var(--accent); text-shadow: 0 0 15px rgba(34,211,238,0.5); }
+  .rate-stat small { color: var(--muted); font-size: 0.72rem; display: block; margin-top: 0.35rem; }
+  .progress-track {
+    grid-column: 1 / -1; height: 8px; background: var(--code);
+    border-radius: 999px; overflow: hidden;
+    border: 1px solid var(--border); margin-top: 0.35rem;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 999px; width: 0%;
+    transition: width 0.6s ease, background 0.3s;
+    box-shadow: 0 0 15px rgba(34,211,238,0.6);
+  }
+  .progress-fill.warn { background: linear-gradient(90deg, var(--yellow), #f97316); box-shadow: 0 0 15px rgba(234,179,8,0.6); }
+  .progress-fill.danger { background: linear-gradient(90deg, var(--red), #dc2626); box-shadow: 0 0 15px rgba(239,68,68,0.6); }
+
+  /* ===== SECTIONS ===== */
+  section { margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.35rem; margin: 0 0 1rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  h2::before {
+    content: "▸"; color: var(--accent);
+    font-size: 1.1rem;
+    text-shadow: 0 0 10px var(--accent);
+  }
+
+  /* ===== ENDPOINT CARDS ===== */
+  .endpoint {
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.3rem 1.4rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03);
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .endpoint::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent-2));
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .endpoint:hover::before { opacity: 1; }
+  .endpoint:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 4px 32px rgba(34, 211, 238, 0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .endpoint-head {
+    display: flex; align-items: center; gap: 0.6rem;
+    flex-wrap: wrap; margin-bottom: 0.6rem;
+  }
+  .method {
+    font-size: 0.7rem; font-weight: 800;
+    padding: 0.22rem 0.6rem; border-radius: 6px;
+    letter-spacing: 0.08em;
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .method.get {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .method.post {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--yellow);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+  }
+  .endpoint-head code {
+    background: var(--code);
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    color: var(--accent);
+    font-family: "SF Mono", Monaco, monospace;
+    border: 1px solid var(--border);
+    overflow-x: auto; white-space: nowrap;
+  }
+  .endpoint p { color: var(--muted); margin: 0.5rem 0 0.75rem; font-size: 0.9rem; }
+  .endpoint p:last-child { margin-bottom: 0; }
+  .endpoint strong { color: var(--text); }
+  .endpoint code.inline {
+    background: var(--code);
+    padding: 0.1em 0.4em; border-radius: 4px;
+    color: var(--accent);
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 0.88em;
+    border: 1px solid var(--border);
+  }
+
+  /* ===== CODE BLOCK ===== */
+  .code-block {
+    position: relative;
+    background: var(--code);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: #cbd5e1;
+    margin: 0.5rem 0;
+    white-space: pre;
+  }
+  .code-block .copy-inline {
+    position: absolute; top: 0.5rem; right: 0.5rem;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.68rem; border-radius: 6px;
+    background: var(--panel-solid);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    box-shadow: none; font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .code-block .copy-inline:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .label-tag {
+    display: inline-block; font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted);
+    font-weight: 700;
+    margin-top: 0.75rem; margin-bottom: 0.35rem;
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .label-tag::before { content: "// "; color: var(--accent); }
+
+  /* ===== CALLOUT ===== */
+  .callout {
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    backdrop-filter: blur(8px);
+  }
+  .callout strong { color: var(--accent); }
+  .callout.warn {
+    background: rgba(234, 179, 8, 0.06);
+    border-color: rgba(234, 179, 8, 0.25);
+    border-left-color: var(--yellow);
+  }
+  .callout.warn strong { color: var(--yellow); }
+  .callout code {
+    background: var(--code); padding: 0.1em 0.4em;
+    border-radius: 4px; color: var(--accent);
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 0.88em;
+  }
+
+  /* ===== FOOTER ===== */
+  footer {
+    text-align: center; color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-family: "SF Mono", Monaco, monospace;
+  }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed; bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: linear-gradient(135deg, var(--green), #059669);
+    color: white;
+    padding: 0.7rem 1.3rem;
+    border-radius: 10px;
+    font-weight: 700; font-size: 0.85rem;
+    transition: transform 0.3s ease;
+    pointer-events: none; z-index: 1000;
+    box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error {
+    background: linear-gradient(135deg, var(--red), #b91c1c);
+    box-shadow: 0 8px 30px rgba(239, 68, 68, 0.5);
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 1.2rem 0.85rem 3rem; }
+    .badge { font-size: 0.62rem; padding: 0.22rem 0.5rem; }
+    .rate-stat .value { font-size: 1.35rem; }
+    .endpoint { padding: 1rem 1.1rem; }
+    .bg-orb { opacity: 0.25; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Animated background layers -->
+<canvas id="bg-canvas"></canvas>
+<div class="bg-orb o1"></div>
+<div class="bg-orb o2"></div>
+<div class="bg-orb o3"></div>
+<div class="bg-grid"></div>
+<div class="bg-scanlines"></div>
+<div class="bg-vignette"></div>
+
+<div class="container">
+
+  <header>
+    <h1>CineSubz Relay API <span class="badge">LIVE</span></h1>
+    <p class="tagline">public JSON relay · search · resolve · decrypt</p>
+  </header>
+
+  <!-- Base URL -->
+  <div class="base-url">
+    <label>▶ API Endpoint</label>
+    <div class="url-row">
+      <code id="base-url">https://days-charger-editor-stayed.trycloudflare.com/</code>
+      <button class="secondary" data-copy="#base-url">Copy</button>
+    </div>
+  </div>
+
+  <!-- Rate panel -->
+  <div class="rate-panel">
+    <div class="rate-head">
+      <h2>Rate Limit · Live Status</h2>
+      <button class="secondary" style="padding:0.4rem 0.8rem; font-size:0.75rem;" id="refresh-btn">↻ Refresh</button>
+    </div>
+    <div class="rate-stats">
+      <div class="rate-stat">
+        <div class="label">Daily Limit</div>
+        <div class="value cyan" id="rl-limit">50</div>
+        <small>requests / IP / day</small>
+      </div>
+      <div class="rate-stat">
+        <div class="label">Used Today</div>
+        <div class="value yellow" id="rl-used">—</div>
+        <small>from your IP</small>
+      </div>
+      <div class="rate-stat">
+        <div class="label">Remaining</div>
+        <div class="value green" id="rl-remain">—</div>
+        <small id="rl-remain-note">checking…</small>
+      </div>
+      <div class="rate-stat">
+        <div class="label">Resets In</div>
+        <div class="value cyan" id="rl-reset">--:--:--</div>
+        <small id="rl-reset-date">00:00 UTC</small>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="rl-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Endpoints -->
+  <section>
+    <h2>Endpoints</h2>
+
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method get">GET</span>
+        <code>/search</code>
+      </div>
+      <p>Search CineSubz by movie or series title. Returns title, page URL, IMDb score and quality badge.</p>
+      <div class="label-tag">full request url</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+https://days-charger-editor-stayed.trycloudflare.com/search?q=deadpool
+      </div>
+      <div class="label-tag">example response</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+{
+  "results": [
+    {
+      "title": "Deadpool",
+      "url": "https://cinesubz.co/movies/deadpool/",
+      "imdb": "8.0",
+      "quality": "HD"
+    }
+  ],
+  "count": 1
+}</div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method get">GET</span>
+        <code>/movie</code>
+      </div>
+      <p>Scrape a CineSubz movie page. Returns every download button with quality label and a pre-resolved direct <code class="inline">.mp4</code> URL when possible.</p>
+      <div class="label-tag">full request url</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+https://days-charger-editor-stayed.trycloudflare.com/movie?url=https://cinesubz.co/movies/deadpool/
+      </div>
+      <p style="margin-top:0.75rem;">Only <code class="inline">cinesubz.co</code> / <code class="inline">cinesubz.lk</code> page URLs are accepted.</p>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method post">POST</span>
+        <code>/start-resolve</code>
+      </div>
+      <p>Decrypt a protected player link and return final <code class="inline">.mp4</code> URLs. Runs in background — you get a <code class="inline">jobId</code> immediately.</p>
+      <div class="label-tag">full request url</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+https://days-charger-editor-stayed.trycloudflare.com/start-resolve
+      </div>
+      <div class="label-tag">request body</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+{
+  "directUrl": "https://drive.csplayer2.space/server1/abc123/file.mp4"
+}
+// or use a page URL instead:
+// { "pageUrl": "https://cinesubz.co/..." }</div>
+      <div class="label-tag">example response</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+{ "success": true, "jobId": "a1b2c3d4e5f6", "poll": "/check-status/a1b2c3d4e5f6" }</div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method get">GET</span>
+        <code>/check-status/:jobId</code>
+      </div>
+      <p>Poll a resolve job. <code class="inline">status</code> is <code class="inline">pending</code>, <code class="inline">done</code>, or <code class="inline">failed</code>. Jobs expire after 10 minutes.</p>
+      <div class="label-tag">full request url</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+https://days-charger-editor-stayed.trycloudflare.com/check-status/a1b2c3d4e5f6
+      </div>
+      <div class="label-tag">example response</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+{ "status": "done", "links": ["https://.../file.mp4"] }</div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-head">
+        <span class="method get">GET</span>
+        <code>/rate-status</code>
+      </div>
+      <p>Check remaining quota for your IP. <strong>Does not consume</strong> your daily limit.</p>
+      <div class="label-tag">full request url</div>
+      <div class="code-block">
+        <button class="copy-inline" data-copy-this>Copy</button>
+https://days-charger-editor-stayed.trycloudflare.com/rate-status
+      </div>
+    </div>
+  </section>
+
+  <!-- Rate rules -->
+  <section>
+    <h2>Rate Limit Rules</h2>
+    <div class="callout warn">
+      <strong>50 requests per IP per day.</strong>
+      Counter resets at <code>00:00 UTC</code> every day. When your quota is exhausted,
+      every endpoint returns HTTP <code>429</code> with a JSON body describing the reset time.
+    </div>
+    <p style="color: var(--muted); font-size: 0.9rem;">
+      Every response includes <code class="inline">X-RateLimit-Limit</code>,
+      <code class="inline">X-RateLimit-Remaining</code> and
+      <code class="inline">X-RateLimit-Reset</code> headers (CORS-exposed).
+      Resolve jobs run through a small concurrency pool, so sending a few requests
+      back-to-back is safe — they settle in order.
+    </p>
+  </section>
+
+  <!-- How to use -->
+  <section>
+    <h2>How to Use · In Order</h2>
+    <div class="callout">
+      <strong>Step 1.</strong> <code>GET /search</code> — find your movie (get its CineSubz page URL).<br/>
+      <strong>Step 2.</strong> <code>GET /movie</code> — get download buttons for that page.<br/>
+      <strong>Step 3.</strong> <code>POST /start-resolve</code> — decrypt a protected player link → get <code>jobId</code>.<br/>
+      <strong>Step 4.</strong> <code>GET /check-status/:jobId</code> — poll until <code>done</code>, read final <code>.mp4</code> links.<br/>
+      <strong>Tip.</strong> <code>GET /rate-status</code> at any time to check your remaining quota (free).
+    </div>
+
+    <div class="label-tag">javascript · full flow</div>
+    <div class="code-block">
+      <button class="copy-inline" data-copy-this>Copy</button>
+<span style="color:#a855f7">const</span> API = <span style="color:#22d3ee">"https://days-charger-editor-stayed.trycloudflare.com/"</span>;
+
+<span style="color:#6b7a99">// Step 1 · Search</span>
+<span style="color:#a855f7">const</span> search = <span style="color:#a855f7">await</span> fetch(<span style="color:#22d3ee">`${API}/search?q=deadpool`</span>).then(r => r.json());
+<span style="color:#a855f7">const</span> movieUrl = search.results[0].url;
+
+<span style="color:#6b7a99">// Step 2 · Get download buttons</span>
+<span style="color:#a855f7">const</span> movie = <span style="color:#a855f7">await</span> fetch(<span style="color:#22d3ee">`${API}/movie?url=${encodeURIComponent(movieUrl)}`</span>).then(r => r.json());
+<span style="color:#a855f7">const</span> first = movie.details.downloadLinks[0];
+
+<span style="color:#6b7a99">// Step 3 · Start resolve job</span>
+<span style="color:#a855f7">const</span> job = <span style="color:#a855f7">await</span> fetch(<span style="color:#22d3ee">`${API}/start-resolve`</span>, {
+  method: <span style="color:#22d3ee">"POST"</span>,
+  headers: { <span style="color:#22d3ee">"Content-Type"</span>: <span style="color:#22d3ee">"application/json"</span> },
+  body: JSON.stringify({ directUrl: first.directUrl })
+}).then(r => r.json());
+
+<span style="color:#6b7a99">// Step 4 · Poll</span>
+<span style="color:#a855f7">const</span> result = <span style="color:#a855f7">await</span> fetch(<span style="color:#22d3ee">`${API}/check-status/${job.jobId}`</span>).then(r => r.json());
+console.log(result.links);
+    </div>
+
+    <div class="label-tag">curl · quick test</div>
+    <div class="code-block">
+      <button class="copy-inline" data-copy-this>Copy</button>
+<span style="color:#10b981">curl</span> <span style="color:#22d3ee">"https://days-charger-editor-stayed.trycloudflare.com/search?q=deadpool"</span>
+
+<span style="color:#10b981">curl</span> -X POST <span style="color:#22d3ee">"https://days-charger-editor-stayed.trycloudflare.com/start-resolve"</span> \
+  -H <span style="color:#22d3ee">"Content-Type: application/json"</span> \
+  -d <span style="color:#22d3ee">'{"directUrl":"https://drive.csplayer2.space/server1/abc/file.mp4"}'</span>
+    </div>
+  </section>
+
+  <footer>
+    CineSubz Relay API · <span id="year"></span> · not affiliated with CineSubz
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_BASE = "https://days-charger-editor-stayed.trycloudflare.com/";
+  let resetAt = null;
+
+  /* ============ PARTICLES ============ */
+  (function initParticles() {
+    const canvas = document.getElementById("bg-canvas");
+    const ctx = canvas.getContext("2d");
+    let width, height, particles = [];
+    const COUNT = 45;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+    function makeParticle() {
+      return {
+        x: rand(0, width), y: rand(0, height),
+        vx: rand(-0.2, 0.2), vy: rand(-0.2, 0.2),
+        r: rand(0.5, 1.8),
+        hue: Math.random() < 0.5 ? 187 : 277,
+        a: rand(0.3, 0.7),
+      };
+    }
+    function init() {
+      resize();
+      particles = Array.from({ length: COUNT }, makeParticle);
+    }
+    function tick() {
+      ctx.clearRect(0, 0, width, height);
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < 120 * 120) {
+            const alpha = 1 - Math.sqrt(d2) / 120;
+            ctx.strokeStyle = `hsla(190, 100%, 60%, ${alpha * 0.12})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, 100%, 65%, ${p.a})`;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = `hsla(${p.hue}, 100%, 65%, ${p.a})`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0 || p.x > width) p.vx *= -1;
+        if (p.y < 0 || p.y > height) p.vy *= -1;
+        p.x = Math.max(0, Math.min(width, p.x));
+        p.y = Math.max(0, Math.min(height, p.y));
+      }
+      requestAnimationFrame(tick);
+    }
+    window.addEventListener("resize", init);
+    init();
+    tick();
+  })();
+
+  /* ============ TOAST ============ */
+  let toastTimer;
+  function showToast(msg, isError = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.toggle("error", isError);
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  /* ============ COPY (data-copy / data-copy-this) ============ */
+  document.addEventListener("click", (e) => {
+    const selBtn = e.target.closest("[data-copy]");
+    if (selBtn) {
+      const target = document.querySelector(selBtn.dataset.copy);
+      if (target) {
+        navigator.clipboard.writeText(target.textContent.trim()).then(
+          () => showToast("Copied"),
+          () => showToast("Copy failed", true)
+        );
+      }
+      return;
+    }
+    const btn = e.target.closest("[data-copy-this]");
+    if (btn) {
+      const block = btn.closest(".code-block");
+      if (!block) return;
+      const clone = block.cloneNode(true);
+      const cloneBtn = clone.querySelector(".copy-inline");
+      if (cloneBtn) cloneBtn.remove();
+      const text = clone.textContent.trim();
+      navigator.clipboard.writeText(text).then(
+        () => showToast("Copied"),
+        () => showToast("Copy failed", true)
+      );
+    }
+  });
+
+  /* ============ RATE STATUS ============ */
+  async function loadRateStatus() {
+    const limitEl = document.getElementById("rl-limit");
+    const usedEl = document.getElementById("rl-used");
+    const remainEl = document.getElementById("rl-remain");
+    const remainNote = document.getElementById("rl-remain-note");
+    const barEl = document.getElementById("rl-bar");
+    const resetDateEl = document.getElementById("rl-reset-date");
+
+    try {
+      const res = await fetch(`${API_BASE}/rate-status`, { cache: "no-store" });
+      const data = await res.json();
+
+      if (data.bypass) {
+        limitEl.textContent = "∞";
+        usedEl.textContent = "—";
+        remainEl.textContent = "∞";
+        remainEl.className = "value green";
+        remainNote.textContent = "bypass active";
+        barEl.style.width = "0%";
+        barEl.className = "progress-fill";
+        return;
+      }
+
+      const limit = data.limit;
+      const used = data.used;
+      const remaining = data.remaining;
+
+      limitEl.textContent = limit;
+      usedEl.textContent = used;
+      remainEl.textContent = remaining;
+      remainEl.className = "value " + (remaining === 0 ? "red" : remaining < 10 ? "yellow" : "green");
+      remainNote.textContent = `${used} of ${limit} used`;
+
+      const pct = limit > 0 ? (used / limit) * 100 : 0;
+      barEl.style.width = Math.min(100, pct) + "%";
+      barEl.className = "progress-fill" + (pct >= 100 ? " danger" : pct >= 80 ? " warn" : "");
+
+      if (data.resetAt) {
+        resetAt = new Date(data.resetAt);
+        if (resetDateEl) {
+          try {
+            const opts = { timeZone: "UTC", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" };
+            resetDateEl.textContent = resetAt.toLocaleString("en-US", opts) + " UTC";
+          } catch {}
+        }
+        updateCountdown();
+      }
+    } catch (e) {
+      remainEl.textContent = "—";
+      remainEl.className = "value red";
+      remainNote.textContent = "API unreachable";
+    }
+  }
+
+  function updateCountdown() {
+    if (!resetAt) return;
+    const el = document.getElementById("rl-reset");
+    const diff = resetAt.getTime() - Date.now();
+    if (diff <= 0) {
+      el.textContent = "00:00:00";
+      setTimeout(loadRateStatus, 5000);
+      return;
+    }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent =
+      String(h).padStart(2, "0") + ":" +
+      String(m).padStart(2, "0") + ":" +
+      String(s).padStart(2, "0");
+  }
+  setInterval(updateCountdown, 1000);
+
+  /* ============ INIT ============ */
+  document.getElementById("year").textContent = new Date().getFullYear();
+  document.getElementById("refresh-btn").addEventListener("click", loadRateStatus);
+  loadRateStatus();
+  setInterval(loadRateStatus, 30000);
+</script>
+</body>
+</html>
